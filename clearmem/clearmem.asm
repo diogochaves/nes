@@ -2,7 +2,6 @@
 ;; The iNES header (contains a total of 16 bytes with the flags at $7F00)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 .segment "HEADER"
-.org $7F00
 .byte $4E,$45,$53,$1A		; 4 bytes with the characters 'N','E','S',"\n"
 .byte $02					; How many 16KB of PRG-ROM we'll use (=32KB)
 .byte $01					; How many 8KB of CHR-ROM we'll use (=8KB)
@@ -17,24 +16,43 @@
 ;; PRG-ROM code located at $8000
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 .segment "CODE"
-.org $8000
-
-RESET:
-	sei						; diable all IRQ interrupts
-	cld						; Clear the decimal mode (unsupported by the NES)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Reset handler (called when the NES resets/powers-on)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Reset:
+	sei						; Disable all IRQ interrupts
+	cld 					; Clear the decimal mode (unsupported by the NES)
 	ldx #$FF
 	txs						; Initialize the stack pointer at $01FF
 
-	lda #0					; A = 0
-	inx						; Increment X from $FF to 0
-MemLoop:
-	sta $0,x				; Store the value of A (zero) into {$0 + X}
-	dex 					; X--
-	bne MemLoop				; If X is not zero, we loop back to the MemLoop label
+	inx						; Increment X, causing a roll-off from $FF to $00
 
+	txa						; A = 0
+
+ClearRAM:
+	sta $0000,x				; Zero RAM addresses from $0000 to $00FF
+	sta $0100,x				; Zero RAM addresses from $0100 to $01FF
+	sta $0200,x				; Zero RAM addresses from $0200 to $02FF
+	sta $0300,x				; Zero RAM addresses from $0300 to $03FF
+	sta $0400,x				; Zero RAM addresses from $0400 to $04FF
+	sta $0500,x				; Zero RAM addresses from $0500 to $05FF
+	sta $0600,x				; Zero RAM addresses from $0600 to $06FF
+	sta $0700,x				; Zero RAM addresses from $0700 to $07FF
+	inx						; X++
+	bne ClearRAM			; Loops until X reaches 0 again (after roll-off)
+
+LoopForever:
+	jmp LoopForever			; Forces an infinite loop
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; NMI interrupt handler
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 NMI:
 	rti						; Return from interrupt
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; IRQ interrupt handler
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 IRQ:
 	rti						; Return from interrupt
 
@@ -42,7 +60,6 @@ IRQ:
 ;; Vectors with the addresses of the handlers that we always add at $FFFA
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 .segment "VECTORS"
-.org $FFFA
 .word NMI					; address (2 bytes) of the NMI handler
-.word RESET					; address (2 bytes) of the RESET handler
+.word Reset					; address (2 bytes) of the RESET handler
 .word IRQ					; address (2 bytes) of the IRQ handler
