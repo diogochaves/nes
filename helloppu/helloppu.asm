@@ -38,6 +38,16 @@ Reset:
 	txs						; Initialize the stack pointer at $01FF
 
 	inx						; Increment X, causing a roll-off from $FF to $00
+    stx PPU_CTRL			; disable NMI
+    stx PPU_MASK			; disable rendering
+	stx $4010				; disable DMC IRQs
+
+    lda #$40
+    sta $4017				; disable APU frame IRQ	
+
+Wait1stVBlank:				; Wait for the first  VBlank from the PPU
+	bit PPU_STATUS			; Perform a bit-wise check with the PPU_STATUS port
+	bpl Wait1stVBlank		; Loop until bit-7 (sign bit) is 1 (inside VBlank)
 
 	txa						; A = 0
 
@@ -52,6 +62,10 @@ ClearRAM:
 	sta $0700,x				; Zero RAM addresses from $0700 to $07FF
 	inx						; X++
 	bne ClearRAM			; Loops until X reaches 0 again (after roll-off)
+
+Wait2ndVBlank:				; Wait for the first  VBlank from the PPU
+	bit PPU_STATUS			; Perform a bit-wise check with the PPU_STATUS port
+	bpl Wait2ndVBlank		; Loop until bit-7 (sign bit) is 1 (inside VBlank)
 
 Main:
 	ldx #$3F
